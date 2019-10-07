@@ -1,0 +1,20 @@
+apiVersion: skaffold/v1beta15
+kind: Config
+metadata:
+  name: skaffold-create-react-app
+build:
+  artifacts:
+  - image: skaffold-create-react-app
+    sync:
+      infer:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.css'
+deploy:
+  kubectl:
+    manifests:
+    - k8s/deployment.yaml
+portForward:
+- resourceType: deployment
+  resourceName: create-react-app
+  port: 3000
