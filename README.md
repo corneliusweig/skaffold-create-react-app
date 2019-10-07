@@ -1,44 +1,114 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Skaffold with `create-react-app`
+===
 
-## Available Scripts
+This is a showcase for Skaffold with create-react-app.
 
-In the project directory, you can run:
+Why?
+---
 
-### `npm start`
+If you want to develop a react app and deploy on kubernetes, you want fast feedback cycles.
+Skaffold is a dedicated tool to help with this _inner dev-loop_ and it offers some nifty optimizations around script languages.
+This showcase demonstrates how to get this working efficiently.
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+How?
+---
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+These steps explain how this repository was created.
+Use this as a guide to get started with new projects.
 
-### `npm test`
+1. Run `create-react-app` like so:
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+       npx create-react-app . --typescript --use-npm
 
-### `npm run build`
+   For instructions how to work with `create-react-app` go [here](https://create-react-app.dev/docs/getting-started).
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. Add a `Dockerfile` to instruct the container builder how to construct your container:
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+   ```Dockerfile
+   FROM node:12-alpine
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+   WORKDIR /app
+   EXPOSE 3000
+   CMD ["npm", "run", "start"]
 
-### `npm run eject`
+   COPY package* ./
+   RUN npm ci
+   COPY . .
+   ```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+1. Add a `.dockerignore` file to ignore unwanted files. This is important so that Skaffold knows what files it may ignore:
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+   ```.dockerignore
+   .git
+   node_modules
+   **/*.swp
+   **/*.tsx~
+   **/*.swn
+   **/*.swo
+   ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (Webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+1. Add a kubernetes manifest for your app
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+   ```yaml
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: create-react-app
+   spec:
+     selector:
+       matchLabels:
+         app: create-react-app
+     template:
+       metadata:
+         labels:
+           app: create-react-app
+       spec:
+         containers:
+         - name: create-react-app
+           image: skaffold-create-react-app
+           ports:
+           - containerPort: 3000
+   ```
 
-## Learn More
+1. Run `skaffold init` and add the following items:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+   * Tell Skaffold to copy `.ts` or `.tsx` files into your container instead of rebuilding:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+     ```yaml
+     build:
+       artifacts:
+       - image: skaffold-create-react-app
+         sync:
+           infer:
+           - '**/*.ts'
+           - '**/*.tsx'
+           - '**/*.css'
+     ```
+
+     This sync mode works entirely different to docker-compose with a local volume, as it copies the files into the running container.
+     The advantage is that this will work no matter how your kubernetes cluster is set up, be it remote or local.
+
+   * Tell Skaffold which port to forward so that you can access your app on localhost:
+
+     ```yaml
+     portForward:
+     - resourceType: deployment
+       resourceName: create-react-app
+       port: 3000
+     ```
+
+1. Start developing with
+
+       skaffold dev --port-forward
+
+   This last command assumes that you have set up a kubernetes cluster. If you have not, take a look at [minikube](https://github.com/kubernetes/minikube).
+
+1. Access your app on `http://localhost:3000`.
+   When you make changes, the changed files should be sync'ed into the container and the node watcher should pick up the changes.
+   In particular, the container should _not rebuild_.
+   If it does nevertheless, run `skaffold dev -v debug` and look out for temporary files which should be added to `.dockerignore`.
+
+
+> :warning: Note that the container runs `npm run start` which is the dev mode. When going to production, you should run `npm run build` and build a dedicated container.
+
+**Happy hacking!**
