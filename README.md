@@ -18,7 +18,7 @@ Use this as a guide to get started with new projects.
 
 1. Run `create-react-app` like so:
 
-       npx create-react-app . --typescript --use-npm
+       npx create-react-app . --template typescript --use-npm
 
    For instructions how to work with `create-react-app` go [here](https://create-react-app.dev/docs/getting-started).
 

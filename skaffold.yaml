@@ -1,4 +1,4 @@
-apiVersion: skaffold/v1beta15
+apiVersion: skaffold/v2beta10
 kind: Config
 metadata:
   name: skaffold-create-react-app
@@ -10,6 +10,8 @@ build:
       - '**/*.ts'
       - '**/*.tsx'
       - '**/*.css'
+    docker:
+      dockerfile: Dockerfile
 deploy:
   kubectl:
     manifests:
